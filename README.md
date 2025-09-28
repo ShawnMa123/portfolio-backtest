@@ -116,6 +116,8 @@ python scripts/init_data.py
 **开发环境:**
 ```bash
 # 启动Celery Worker (新终端)
+# 注意：确保在项目根目录执行
+cd /path/to/portfolio-backtest
 python scripts/celery_worker.py
 
 # 启动Flask应用
@@ -286,7 +288,17 @@ python scripts/monitor.py --alert
 
 ### 常见问题
 
-1. **WARP代理连接失败**
+1. **模块导入错误 (ModuleNotFoundError: No module named 'app')**
+   ```bash
+   # 确保在项目根目录执行脚本
+   cd /path/to/portfolio-backtest
+   python scripts/celery_worker.py
+
+   # 或使用绝对路径
+   cd /path/to/portfolio-backtest && python scripts/celery_worker.py
+   ```
+
+2. **WARP代理连接失败**
    ```bash
    # 重启代理池
    docker-compose -f docker-compose.warp.yml restart
@@ -295,7 +307,7 @@ python scripts/monitor.py --alert
    docker logs warp-proxy-1
    ```
 
-2. **数据库连接问题**
+3. **数据库连接问题**
    ```bash
    # 测试数据库连接
    psql $DATABASE_URL
@@ -304,7 +316,7 @@ python scripts/monitor.py --alert
    echo $DATABASE_URL
    ```
 
-3. **Redis连接问题**
+4. **Redis连接问题**
    ```bash
    # 测试Redis连接
    redis-cli -u $REDIS_URL ping
@@ -313,7 +325,7 @@ python scripts/monitor.py --alert
    celery -A app.tasks inspect active
    ```
 
-4. **内存不足**
+5. **内存不足**
    ```bash
    # 查看系统资源
    free -h

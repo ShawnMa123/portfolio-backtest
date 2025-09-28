@@ -70,6 +70,11 @@ def test_proxy_pool():
     print("🔍 测试代理池...")
 
     try:
+        # 添加项目根目录到Python路径
+        import os
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
         from app.utils.proxy_pool import get_proxy_pool
 
         # 获取代理池实例
@@ -109,6 +114,11 @@ def test_data_service():
     print("📊 测试数据服务...")
 
     try:
+        # 添加项目根目录到Python路径
+        import os
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
         from app.services.data_service import DataService
 
         # 创建数据服务实例
