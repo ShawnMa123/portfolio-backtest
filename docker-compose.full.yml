@@ -41,7 +41,7 @@ services:
   # Redis - 代理池专用
   redis-proxy-pool:
     image: redis:7-alpine
-    container_name: redis-proxy-pool
+    container_name: redis-proxy-pool-full
     ports:
       - "6380:6379"
     volumes:
@@ -56,7 +56,7 @@ services:
   # WARP 代理池
   warp-1:
     image: caomingjun/warp
-    container_name: warp-proxy-1
+    container_name: warp-proxy-1-full
     restart: unless-stopped
     ports:
       - "40001:1080"
@@ -70,7 +70,7 @@ services:
 
   warp-2:
     image: caomingjun/warp
-    container_name: warp-proxy-2
+    container_name: warp-proxy-2-full
     restart: unless-stopped
     ports:
       - "40002:1080"
@@ -84,7 +84,7 @@ services:
 
   warp-3:
     image: caomingjun/warp
-    container_name: warp-proxy-3
+    container_name: warp-proxy-3-full
     restart: unless-stopped
     ports:
       - "40003:1080"
@@ -98,7 +98,7 @@ services:
 
   warp-4:
     image: caomingjun/warp
-    container_name: warp-proxy-4
+    container_name: warp-proxy-4-full
     restart: unless-stopped
     ports:
       - "40004:1080"
@@ -112,7 +112,7 @@ services:
 
   warp-5:
     image: caomingjun/warp
-    container_name: warp-proxy-5
+    container_name: warp-proxy-5-full
     restart: unless-stopped
     ports:
       - "40005:1080"

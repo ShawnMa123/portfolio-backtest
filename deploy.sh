@@ -67,6 +67,11 @@ deploy_full() {
     # 停止现有服务
     print_info "停止现有服务..."
     $DOCKER_COMPOSE_CMD -f docker-compose.full.yml down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml down 2>/dev/null || true
+
+    # 清理可能的容器名冲突
+    print_info "清理容器名冲突..."
+    docker rm -f redis-proxy-pool warp-proxy-1 warp-proxy-2 warp-proxy-3 warp-proxy-4 warp-proxy-5 2>/dev/null || true
 
     # 构建镜像
     print_info "构建应用镜像..."
@@ -96,6 +101,11 @@ deploy_hybrid() {
     # 停止现有服务
     print_info "停止现有中间件服务..."
     $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml down 2>/dev/null || true
+
+    # 清理可能的容器名冲突
+    print_info "清理容器名冲突..."
+    docker rm -f portfolio-postgres portfolio-redis redis-proxy-pool-full warp-proxy-1-full warp-proxy-2-full warp-proxy-3-full warp-proxy-4-full warp-proxy-5-full 2>/dev/null || true
 
     # 启动中间件
     print_info "启动中间件服务（数据库、Redis、代理池）..."
