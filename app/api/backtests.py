@@ -71,7 +71,7 @@ class BacktestList(Resource):
     @jwt_required()
     def get(self):
         """获取用户回测结果列表"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio_id = request.args.get('portfolio_id', type=int)
 
         query = db.session.query(BacktestResult).join(Portfolio).filter(Portfolio.user_id == user_id)
@@ -88,7 +88,7 @@ class BacktestList(Resource):
     @jwt_required()
     def post(self):
         """发起回测"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
 
         # 验证投资组合是否属于当前用户
@@ -113,7 +113,10 @@ class BacktestList(Resource):
             return result.to_dict(), 201
 
         except Exception as e:
-            return {'message': f'回测执行失败: {str(e)}'}, 500
+            import traceback
+            error_msg = f'回测执行失败: {str(e)}'
+            print(f"回测错误详情: {traceback.format_exc()}")
+            return {'message': error_msg}, 500
 
 @ns.route('/<int:backtest_id>')
 class BacktestDetail(Resource):
@@ -121,7 +124,7 @@ class BacktestDetail(Resource):
     @jwt_required()
     def get(self, backtest_id):
         """获取回测结果详情"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         backtest = db.session.query(BacktestResult).join(Portfolio).filter(
             BacktestResult.id == backtest_id,
@@ -136,7 +139,7 @@ class BacktestDetail(Resource):
     @jwt_required()
     def delete(self, backtest_id):
         """删除回测结果"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         backtest = db.session.query(BacktestResult).join(Portfolio).filter(
             BacktestResult.id == backtest_id,
@@ -157,7 +160,7 @@ class BacktestTransactions(Resource):
     @jwt_required()
     def get(self, backtest_id):
         """获取回测交易记录"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         # 验证回测结果是否属于当前用户
         backtest = db.session.query(BacktestResult).join(Portfolio).filter(
@@ -185,7 +188,7 @@ class BacktestHoldings(Resource):
     @jwt_required()
     def get(self, backtest_id):
         """获取回测持仓记录"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         # 验证回测结果是否属于当前用户
         backtest = db.session.query(BacktestResult).join(Portfolio).filter(
@@ -221,7 +224,7 @@ class BacktestPerformance(Resource):
     @jwt_required()
     def get(self, backtest_id):
         """获取回测绩效数据"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         # 验证回测结果是否属于当前用户
         backtest = db.session.query(BacktestResult).join(Portfolio).filter(
@@ -256,7 +259,7 @@ class PortfolioBacktests(Resource):
     @jwt_required()
     def get(self, portfolio_id):
         """获取指定投资组合的所有回测结果"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         # 验证投资组合是否属于当前用户
         portfolio = Portfolio.query.filter_by(

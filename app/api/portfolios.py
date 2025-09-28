@@ -67,7 +67,7 @@ class PortfolioList(Resource):
     @jwt_required()
     def get(self):
         """获取用户投资组合列表"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolios = Portfolio.query.filter_by(user_id=user_id).order_by(Portfolio.created_at.desc()).all()
         return [portfolio.to_dict() for portfolio in portfolios]
 
@@ -76,7 +76,7 @@ class PortfolioList(Resource):
     @jwt_required()
     def post(self):
         """创建投资组合"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
 
         portfolio = Portfolio(
@@ -98,7 +98,7 @@ class PortfolioDetail(Resource):
     @jwt_required()
     def get(self, portfolio_id):
         """获取投资组合详情"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -115,7 +115,7 @@ class PortfolioDetail(Resource):
     @jwt_required()
     def put(self, portfolio_id):
         """更新投资组合"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -137,7 +137,7 @@ class PortfolioDetail(Resource):
     @jwt_required()
     def delete(self, portfolio_id):
         """删除投资组合"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -154,7 +154,7 @@ class PortfolioConfigurationList(Resource):
     @jwt_required()
     def get(self, portfolio_id):
         """获取投资组合配置"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -172,7 +172,7 @@ class PortfolioConfigurationList(Resource):
     @jwt_required()
     def post(self, portfolio_id):
         """添加投资组合配置"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -227,7 +227,7 @@ class PortfolioConfigurationDetail(Resource):
     @jwt_required()
     def get(self, portfolio_id, config_id):
         """获取配置详情"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -259,7 +259,7 @@ class PortfolioConfigurationDetail(Resource):
     @jwt_required()
     def put(self, portfolio_id, config_id):
         """更新配置"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:
@@ -296,7 +296,7 @@ class PortfolioConfigurationDetail(Resource):
     @jwt_required()
     def delete(self, portfolio_id, config_id):
         """删除配置"""
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         portfolio = Portfolio.query.filter_by(id=portfolio_id, user_id=user_id).first()
 
         if not portfolio:

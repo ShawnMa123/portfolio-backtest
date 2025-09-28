@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回测工具 - ETF/股票回测系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .instrument-list {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .instrument-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: #f7fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .instrument-info {
+            flex: 1;
+        }
+
+        .instrument-symbol {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .instrument-name {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+
+        .weight-input {
+            width: 80px;
+            padding: 0.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .remove-btn {
+            background: #fed7d7;
+            color: #c53030;
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-block {
+            width: 100%;
+            margin: 1rem 0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 2rem 0;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #276749;
+            border: 1px solid #9ae6b4;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab-button {
+            padding: 1rem 2rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #718096;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .transaction-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .transaction-table th,
+        .transaction-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .transaction-table th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 投资组合回测工具</h1>
+            <p>输入投资策略参数，立即进行历史数据回测分析</p>
+            <a href="/" class="btn btn-secondary" style="margin-top: 1rem;">← 返回首页</a>
+        </div>
+
+        <!-- 回测表单 -->
+        <div class="card">
+            <h2>🔧 回测配置</h2>
+            <form id="backtestForm">
+                <div class="form-grid">
+                    <div>
+                        <div class="form-group">
+                            <label for="portfolioName">投资组合名称</label>
+                            <input type="text" id="portfolioName" class="form-control" value="我的回测组合" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="initialCapital">初始资金 (美元)</label>
+                            <input type="number" id="initialCapital" class="form-control" value="10000" min="1000" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="frequency">投资频率</label>
+                            <select id="frequency" class="form-control" required>
+                                <option value="MONTHLY">每月定投</option>
+                                <option value="WEEKLY">每周定投</option>
+                                <option value="DAILY">每日定投</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="buyAmount">单次投资金额 (美元)</label>
+                            <input type="number" id="buyAmount" class="form-control" value="1000" min="100" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="form-group">
+                            <label for="startDate">回测开始日期</label>
+                            <input type="date" id="startDate" class="form-control" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="endDate">回测结束日期</label>
+                            <input type="date" id="endDate" class="form-control" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="transactionFee">手续费率 (%)</label>
+                            <input type="number" id="transactionFee" class="form-control" value="0.03" min="0" max="1" step="0.01" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>投资标的</label>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <input type="text" id="symbolInput" class="form-control" placeholder="输入股票代码 (如: SPY, QQQ, AAPL)" style="flex: 1;">
+                        <button type="button" id="addSymbolBtn" class="btn btn-secondary">添加标的</button>
+                    </div>
+                    <div id="instrumentList" class="instrument-list">
+                        <p style="text-align: center; color: #718096;">请添加投资标的</p>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">🚀 开始回测</button>
+            </form>
+        </div>
+
+        <!-- 加载状态 -->
+        <div id="loading" class="card loading">
+            <div class="spinner"></div>
+            <h3>正在执行回测...</h3>
+            <p>这可能需要几秒钟时间，请耐心等待</p>
+        </div>
+
+        <!-- 错误信息 -->
+        <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+
+        <!-- 回测结果 -->
+        <div id="results" class="results">
+            <!-- 绩效指标 -->
+            <div class="card">
+                <h2>📊 回测结果</h2>
+                <div id="metricsGrid" class="metrics-grid">
+                    <!-- 动态生成指标卡片 -->
+                </div>
+            </div>
+
+            <!-- 图表和详细数据 -->
+            <div class="card">
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="chart">📈 收益曲线</button>
+                    <button class="tab-button" data-tab="transactions">💰 交易记录</button>
+                    <button class="tab-button" data-tab="holdings">📋 持仓详情</button>
+                </div>
+
+                <div id="chartTab" class="tab-content active">
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="transactionsTab" class="tab-content">
+                    <h3>交易记录</h3>
+                    <div id="transactionsTable"></div>
+                </div>
+
+                <div id="holdingsTab" class="tab-content">
+                    <h3>最终持仓</h3>
+                    <div id="holdingsTable"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let token = null;
+        let chart = null;
+        let instruments = [];
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDates();
+            setupEventListeners();
+            login();
+        });
+
+        // 设置默认日期
+        function initializeDates() {
+            const today = new Date();
+            const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+
+            document.getElementById('startDate').value = oneYearAgo.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            document.getElementById('backtestForm').addEventListener('submit', handleBacktest);
+            document.getElementById('addSymbolBtn').addEventListener('click', addSymbol);
+            document.getElementById('symbolInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addSymbol();
+                }
+            });
+
+            // 标签页切换
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+        }
+
+        // 自动登录
+        async function login() {
+            try {
+                const response = await axios.post('/api/auth/login', {
+                    username: 'demo',
+                    password: 'password123'
+                });
+
+                token = response.data.access_token;
+                axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+                // 添加默认标的
+                addDefaultInstruments();
+            } catch (error) {
+                showError('登录失败，请检查系统状态');
+            }
+        }
+
+        // 添加默认投资标的
+        function addDefaultInstruments() {
+            const defaultSymbols = ['SPY', 'QQQ'];
+            defaultSymbols.forEach(symbol => {
+                addSymbolToList(symbol);
+            });
+        }
+
+        // 添加投资标的
+        async function addSymbol() {
+            const symbolInput = document.getElementById('symbolInput');
+            const symbol = symbolInput.value.trim().toUpperCase();
+
+            if (!symbol) return;
+
+            try {
+                // 搜索标的信息
+                const response = await axios.get(`/api/instruments/search?symbol=${symbol}`);
+                addSymbolToList(symbol, response.data);
+                symbolInput.value = '';
+            } catch (error) {
+                showError(`标的 ${symbol} 不存在或获取信息失败`);
+            }
+        }
+
+        // 添加标的到列表
+        function addSymbolToList(symbol, instrumentData = null) {
+            // 检查是否已存在
+            if (instruments.find(item => item.symbol === symbol)) {
+                showError(`标的 ${symbol} 已存在`);
+                return;
+            }
+
+            const instrument = {
+                symbol: symbol,
+                name: instrumentData ? instrumentData.name : symbol,
+                weight: (100 / (instruments.length + 1)).toFixed(1)
+            };
+
+            instruments.push(instrument);
+            updateInstrumentList();
+        }
+
+        // 更新投资标的列表显示
+        function updateInstrumentList() {
+            const container = document.getElementById('instrumentList');
+
+            if (instruments.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #718096;">请添加投资标的</p>';
+                return;
+            }
+
+            // 重新计算权重
+            const equalWeight = (100 / instruments.length).toFixed(1);
+            instruments.forEach(item => item.weight = equalWeight);
+
+            container.innerHTML = instruments.map((item, index) => `
+                <div class="instrument-item">
+                    <div class="instrument-info">
+                        <div class="instrument-symbol">${item.symbol}</div>
+                        <div class="instrument-name">${item.name}</div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" class="weight-input" value="${item.weight}"
+                               min="0" max="100" step="0.1"
+                               onchange="updateWeight(${index}, this.value)">
+                        <span style="margin-left: 0.5rem;">%</span>
+                        <button type="button" class="remove-btn" onclick="removeInstrument(${index})">移除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 更新权重
+        function updateWeight(index, weight) {
+            instruments[index].weight = parseFloat(weight);
+        }
+
+        // 移除投资标的
+        function removeInstrument(index) {
+            instruments.splice(index, 1);
+            updateInstrumentList();
+        }
+
+        // 执行回测
+        async function handleBacktest(e) {
+            e.preventDefault();
+
+            if (instruments.length === 0) {
+                showError('请至少添加一个投资标的');
+                return;
+            }
+
+            // 验证权重总和
+            const totalWeight = instruments.reduce((sum, item) => sum + parseFloat(item.weight), 0);
+            if (Math.abs(totalWeight - 100) > 0.1) {
+                showError(`权重总和应为100%，当前为${totalWeight.toFixed(1)}%`);
+                return;
+            }
+
+            showLoading();
+            hideError();
+
+            try {
+                // 创建投资组合
+                const portfolioData = {
+                    name: document.getElementById('portfolioName').value,
+                    description: '通过前端工具创建的回测组合',
+                    initial_capital: parseFloat(document.getElementById('initialCapital').value),
+                    currency: 'USD'
+                };
+
+                const portfolioResponse = await axios.post('/api/portfolios', portfolioData);
+                const portfolioId = portfolioResponse.data.id;
+
+                // 添加投资配置
+                for (const instrument of instruments) {
+                    // 先搜索或创建标的
+                    await axios.get(`/api/instruments/search?symbol=${instrument.symbol}`);
+
+                    // 获取标的ID
+                    const instrumentResponse = await axios.get(`/api/instruments/search?symbol=${instrument.symbol}`);
+
+                    const configData = {
+                        instrument_id: instrumentResponse.data.id,
+                        weight: parseFloat(instrument.weight) / 100,
+                        investment_frequency: document.getElementById('frequency').value,
+                        frequency_detail: getFrequencyDetail(),
+                        transaction_fee_rate: parseFloat(document.getElementById('transactionFee').value) / 100,
+                        buy_type: 'AMOUNT',
+                        buy_amount: parseFloat(document.getElementById('buyAmount').value) * (parseFloat(instrument.weight) / 100),
+                        start_date: document.getElementById('startDate').value
+                    };
+
+                    await axios.post(`/api/portfolios/${portfolioId}/configurations`, configData);
+                }
+
+                // 执行回测
+                const backtestData = {
+                    portfolio_id: portfolioId,
+                    name: `${portfolioData.name} - 回测结果`,
+                    start_date: document.getElementById('startDate').value,
+                    end_date: document.getElementById('endDate').value
+                };
+
+                const backtestResponse = await axios.post('/api/backtests', backtestData);
+
+                // 显示结果
+                await displayResults(backtestResponse.data);
+
+            } catch (error) {
+                console.error('回测失败:', error);
+                showError(error.response?.data?.message || '回测执行失败，请检查输入参数');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 获取频率详细配置
+        function getFrequencyDetail() {
+            const frequency = document.getElementById('frequency').value;
+            switch (frequency) {
+                case 'MONTHLY':
+                    return { day: 1 };
+                case 'WEEKLY':
+                    return { weekday: 1 }; // Monday
+                case 'DAILY':
+                    return {};
+                default:
+                    return {};
+            }
+        }
+
+        // 显示回测结果
+        async function displayResults(backtestResult) {
+            // 显示基本指标
+            displayMetrics(backtestResult);
+
+            // 获取详细绩效数据
+            const performanceResponse = await axios.get(`/api/backtests/${backtestResult.id}/performance`);
+            const performanceData = performanceResponse.data;
+
+            // 绘制图表
+            drawPerformanceChart(performanceData.daily_values);
+
+            // 获取交易记录
+            const transactionsResponse = await axios.get(`/api/backtests/${backtestResult.id}/transactions`);
+            displayTransactions(transactionsResponse.data);
+
+            // 获取持仓记录
+            const holdingsResponse = await axios.get(`/api/backtests/${backtestResult.id}/holdings`);
+            displayHoldings(holdingsResponse.data);
+
+            // 显示结果区域
+            document.getElementById('results').classList.add('show');
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 显示绩效指标
+        function displayMetrics(data) {
+            const metrics = [
+                { label: '总收益率', value: (data.total_return * 100).toFixed(2) + '%', color: data.total_return >= 0 ? '#48bb78' : '#f56565' },
+                { label: '年化收益率', value: (data.annualized_return * 100).toFixed(2) + '%', color: data.annualized_return >= 0 ? '#48bb78' : '#f56565' },
+                { label: '最大回撤', value: data.max_drawdown ? (Math.abs(data.max_drawdown) * 100).toFixed(2) + '%' : 'N/A', color: '#ed8936' },
+                { label: '夏普比率', value: data.sharpe_ratio ? data.sharpe_ratio.toFixed(2) : 'N/A', color: '#667eea' },
+                { label: '波动率', value: data.volatility ? (data.volatility * 100).toFixed(2) + '%' : 'N/A', color: '#9f7aea' },
+                { label: '交易次数', value: data.total_trades.toString(), color: '#38b2ac' },
+                { label: '初始资金', value: '$' + data.initial_capital.toLocaleString(), color: '#4a5568' },
+                { label: '最终价值', value: '$' + data.final_value.toLocaleString(), color: data.final_value >= data.initial_capital ? '#48bb78' : '#f56565' }
+            ];
+
+            const metricsHtml = metrics.map(metric => `
+                <div class="metric-card" style="background: linear-gradient(135deg, ${metric.color} 0%, ${metric.color}99 100%);">
+                    <div class="metric-value">${metric.value}</div>
+                    <div class="metric-label">${metric.label}</div>
+                </div>
+            `).join('');
+
+            document.getElementById('metricsGrid').innerHTML = metricsHtml;
+        }
+
+        // 绘制收益曲线图
+        function drawPerformanceChart(dailyValues) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            const dates = dailyValues.map(item => item.date);
+            const portfolioValues = dailyValues.map(item => item.portfolio_value);
+            const initialValue = portfolioValues[0];
+            const benchmarkValues = portfolioValues.map((_, index) => initialValue * (1 + index * 0.0002)); // 简单基准
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: '投资组合价值',
+                            data: portfolioValues,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: '初始投资',
+                            data: Array(portfolioValues.length).fill(initialValue),
+                            borderColor: '#cbd5e0',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '投资组合收益曲线'
+                        },
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '日期'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '投资组合价值 ($)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // 显示交易记录
+        function displayTransactions(transactions) {
+            if (!transactions || transactions.length === 0) {
+                document.getElementById('transactionsTable').innerHTML = '<p>暂无交易记录</p>';
+                return;
+            }
+
+            const tableHtml = `
+                <table class="transaction-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>标的</th>
+                            <th>类型</th>
+                            <th>数量</th>
+                            <th>价格</th>
+                            <th>金额</th>
+                            <th>手续费</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${transactions.slice(0, 20).map(tx => `
+                            <tr>
+                                <td>${tx.transaction_date}</td>
+                                <td>${tx.instrument?.symbol || 'N/A'}</td>
+                                <td><span style="color: ${tx.transaction_type === 'BUY' ? '#48bb78' : '#f56565'}">${tx.transaction_type}</span></td>
+                                <td>${parseFloat(tx.quantity).toFixed(3)}</td>
+                                <td>$${parseFloat(tx.price).toFixed(2)}</td>
+                                <td>$${parseFloat(tx.total_amount).toFixed(2)}</td>
+                                <td>$${parseFloat(tx.fee).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                ${transactions.length > 20 ? `<p style="margin-top: 1rem; color: #718096;">显示前20条记录，共${transactions.length}条</p>` : ''}
+            `;
+
+            document.getElementById('transactionsTable').innerHTML = tableHtml;
+        }
+
+        // 显示持仓详情
+        function displayHoldings(holdings) {
+            if (!holdings || holdings.length === 0) {
+                document.getElementById('holdingsTable').innerHTML = '<p>暂无持仓记录</p>';
+                return;
+            }
+
+            // 获取最新的持仓记录
+            const latestHoldings = getLatestHoldings(holdings);
+
+            const tableHtml = `
+                <table class="transaction-table">
+                    <thead>
+                        <tr>
+                            <th>标的</th>
+                            <th>持仓数量</th>
+                            <th>平均成本</th>
+                            <th>市值</th>
+                            <th>未实现盈亏</th>
+                            <th>权重</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${latestHoldings.map(holding => `
+                            <tr>
+                                <td>${holding.instrument?.symbol || 'N/A'}</td>
+                                <td>${parseFloat(holding.quantity).toFixed(3)}</td>
+                                <td>$${parseFloat(holding.average_cost).toFixed(2)}</td>
+                                <td>$${parseFloat(holding.market_value).toFixed(2)}</td>
+                                <td style="color: ${holding.unrealized_pnl >= 0 ? '#48bb78' : '#f56565'}">
+                                    $${parseFloat(holding.unrealized_pnl || 0).toFixed(2)}
+                                </td>
+                                <td>${(parseFloat(holding.weight || 0) * 100).toFixed(1)}%</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('holdingsTable').innerHTML = tableHtml;
+        }
+
+        // 获取最新持仓记录
+        function getLatestHoldings(holdings) {
+            const latestDate = Math.max(...holdings.map(h => new Date(h.holding_date).getTime()));
+            return holdings.filter(h => new Date(h.holding_date).getTime() === latestDate);
+        }
+
+        // 切换标签页
+        function switchTab(tabName) {
+            // 更新按钮状态
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+            // 更新内容显示
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').classList.remove('show');
+        }
+
+        // 隐藏加载状态
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            errorDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 隐藏错误信息
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

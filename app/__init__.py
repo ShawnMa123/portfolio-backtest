@@ -3,6 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from config import config
+import sys
+import os
+
+# 设置UTF-8编码
+if sys.platform.startswith('win'):
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -10,6 +16,9 @@ jwt = JWTManager()
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # 设置默认字符编码
+    app.config['JSON_AS_ASCII'] = False
 
     # Initialize extensions
     db.init_app(app)
@@ -24,6 +33,14 @@ def create_app(config_name='default'):
     @app.route('/')
     def index():
         return render_template('index.html')
+
+    @app.route('/backtest')
+    def backtest_tool():
+        return render_template('backtest.html')
+
+    @app.route('/demo')
+    def demo():
+        return render_template('demo.html')
 
     @app.route('/health')
     def health_check():
