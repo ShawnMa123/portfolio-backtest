@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # WARP代理池 - 5个实例
+  warp-1:
+    image: caomingjun/warp
+    container_name: warp-proxy-1
+    restart: unless-stopped
+    ports:
+      - "40001:1080"
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-2:
+    image: caomingjun/warp
+    container_name: warp-proxy-2
+    restart: unless-stopped
+    ports:
+      - "40002:1080"
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-3:
+    image: caomingjun/warp
+    container_name: warp-proxy-3
+    restart: unless-stopped
+    ports:
+      - "40003:1080"
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-4:
+    image: caomingjun/warp
+    container_name: warp-proxy-4
+    restart: unless-stopped
+    ports:
+      - "40004:1080"
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-5:
+    image: caomingjun/warp
+    container_name: warp-proxy-5
+    restart: unless-stopped
+    ports:
+      - "40005:1080"
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  # Redis (用于代理池状态管理)
+  redis-proxy:
+    image: redis:7-alpine
+    container_name: redis-proxy-pool
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_proxy_data:/data
+
+volumes:
+  redis_proxy_data:
+
+networks:
+  default:
+    name: warp-network

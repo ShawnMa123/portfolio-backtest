@@ -1,9 +1,15 @@
-from flask import request
+from flask import request, current_app, g
 from flask_restx import Namespace, Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import Portfolio, BacktestResult, Transaction, PortfolioHolding
 from app.services.backtest_engine import BacktestEngine
+from app.tasks.backtest_tasks import run_backtest_async, get_task_status
+from app.utils.exceptions import (
+    PortfolioNotFoundError, ValidationError, create_error_response, ErrorContext
+)
+from app.utils.logging_config import get_logger, create_request_logger
 from app import db
+import traceback
 
 ns = Namespace('backtests', description='回测相关接口')
 
@@ -30,7 +36,24 @@ backtest_create_model = ns.model('BacktestCreate', {
     'portfolio_id': fields.Integer(required=True, description='组合ID'),
     'name': fields.String(description='回测名称'),
     'start_date': fields.String(required=True, description='开始日期'),
-    'end_date': fields.String(required=True, description='结束日期')
+    'end_date': fields.String(required=True, description='结束日期'),
+    'async_mode': fields.Boolean(default=True, description='是否异步执行')
+})
+
+task_status_model = ns.model('TaskStatus', {
+    'task_id': fields.String(description='任务ID'),
+    'state': fields.String(description='任务状态'),
+    'current': fields.Integer(description='当前进度'),
+    'total': fields.Integer(description='总进度'),
+    'status': fields.String(description='状态描述'),
+    'result': fields.Raw(description='任务结果'),
+    'error': fields.String(description='错误信息')
+})
+
+async_backtest_response_model = ns.model('AsyncBacktestResponse', {
+    'task_id': fields.String(description='任务ID'),
+    'message': fields.String(description='消息'),
+    'status_url': fields.String(description='状态查询URL')
 })
 
 transaction_model = ns.model('Transaction', {
@@ -83,40 +106,183 @@ class BacktestList(Resource):
 
         return [backtest.to_dict() for backtest in backtests]
 
+@ns.route('/tasks/<string:task_id>/status')
+class TaskStatus(Resource):
+    @ns.marshal_with(task_status_model)
+    @jwt_required()
+    def get(self, task_id):
+        """查询异步任务状态"""
+        logger = create_request_logger(g.get('request_id'))
+        user_id = int(get_jwt_identity())
+
+        logger.info(f"用户 {user_id} 查询任务状态: {task_id}")
+
+        try:
+            from celery.result import AsyncResult
+            from app.tasks import celery
+
+            # 获取任务结果
+            task_result = AsyncResult(task_id, app=celery)
+
+            if task_result.state == 'PENDING':
+                response = {
+                    'task_id': task_id,
+                    'state': task_result.state,
+                    'current': 0,
+                    'total': 100,
+                    'status': '等待处理...'
+                }
+            elif task_result.state == 'PROGRESS':
+                response = {
+                    'task_id': task_id,
+                    'state': task_result.state,
+                    'current': task_result.info.get('current', 0),
+                    'total': task_result.info.get('total', 100),
+                    'status': task_result.info.get('status', '处理中...')
+                }
+            elif task_result.state == 'SUCCESS':
+                response = {
+                    'task_id': task_id,
+                    'state': task_result.state,
+                    'current': 100,
+                    'total': 100,
+                    'status': '任务完成',
+                    'result': task_result.result
+                }
+            else:  # FAILURE
+                response = {
+                    'task_id': task_id,
+                    'state': task_result.state,
+                    'current': 0,
+                    'total': 100,
+                    'status': '任务失败',
+                    'error': str(task_result.info) if task_result.info else '未知错误'
+                }
+
+            return response
+
+        except Exception as e:
+            logger.error(f"查询任务状态失败: {str(e)}", exc_info=True)
+            return {
+                'task_id': task_id,
+                'state': 'FAILURE',
+                'current': 0,
+                'total': 100,
+                'status': '查询失败',
+                'error': str(e)
+            }, 500
+
+@ns.route('/tasks/<string:task_id>/cancel')
+class TaskCancel(Resource):
+    @jwt_required()
+    def post(self, task_id):
+        """取消异步任务"""
+        logger = create_request_logger(g.get('request_id'))
+        user_id = int(get_jwt_identity())
+
+        logger.info(f"用户 {user_id} 请求取消任务: {task_id}")
+
+        try:
+            from celery.result import AsyncResult
+            from app.tasks import celery
+
+            # 撤销任务
+            celery.control.revoke(task_id, terminate=True)
+
+            logger.info(f"任务 {task_id} 已被取消")
+
+            return {
+                'message': f'任务 {task_id} 已取消',
+                'task_id': task_id,
+                'status': 'cancelled'
+            }, 200
+
+        except Exception as e:
+            logger.error(f"取消任务失败: {str(e)}", exc_info=True)
+            return {
+                'message': f'取消任务失败: {str(e)}',
+                'task_id': task_id
+            }, 500
+
     @ns.expect(backtest_create_model)
-    @ns.marshal_with(backtest_model)
     @jwt_required()
     def post(self):
-        """发起回测"""
+        """发起回测（支持异步模式）"""
+        logger = create_request_logger(g.get('request_id'))
         user_id = int(get_jwt_identity())
         data = request.get_json()
 
-        # 验证投资组合是否属于当前用户
-        portfolio = Portfolio.query.filter_by(
-            id=data['portfolio_id'],
-            user_id=user_id
-        ).first()
+        with ErrorContext("回测创建", user_id=user_id, portfolio_id=data.get('portfolio_id')):
+            # 数据验证
+            if not data.get('portfolio_id'):
+                raise ValidationError("portfolio_id 是必需的", field='portfolio_id')
 
-        if not portfolio:
-            return {'message': '投资组合不存在'}, 404
+            if not data.get('start_date'):
+                raise ValidationError("start_date 是必需的", field='start_date')
 
-        try:
-            # 执行回测
-            engine = BacktestEngine()
-            result = engine.run_backtest(
-                portfolio_id=data['portfolio_id'],
-                start_date=data['start_date'],
-                end_date=data['end_date'],
-                name=data.get('name')
-            )
+            if not data.get('end_date'):
+                raise ValidationError("end_date 是必需的", field='end_date')
 
-            return result.to_dict(), 201
+            # 验证日期格式
+            try:
+                from datetime import datetime
+                start_dt = datetime.strptime(data['start_date'], '%Y-%m-%d')
+                end_dt = datetime.strptime(data['end_date'], '%Y-%m-%d')
 
-        except Exception as e:
-            import traceback
-            error_msg = f'回测执行失败: {str(e)}'
-            print(f"回测错误详情: {traceback.format_exc()}")
-            return {'message': error_msg}, 500
+                if start_dt >= end_dt:
+                    raise ValidationError("结束日期必须晚于开始日期")
+
+            except ValueError as e:
+                raise ValidationError(f"日期格式错误: {str(e)}")
+
+            # 验证投资组合是否属于当前用户
+            portfolio = Portfolio.query.filter_by(
+                id=data['portfolio_id'],
+                user_id=user_id
+            ).first()
+
+            if not portfolio:
+                raise PortfolioNotFoundError(data['portfolio_id'])
+
+            logger.info(f"用户 {user_id} 发起投资组合 {data['portfolio_id']} 的回测")
+
+            # 判断是否使用异步模式
+            async_mode = data.get('async_mode', True)
+
+            if async_mode:
+                # 异步模式：启动Celery任务
+                task = run_backtest_async.delay(
+                    portfolio_id=data['portfolio_id'],
+                    start_date=data['start_date'],
+                    end_date=data['end_date'],
+                    name=data.get('name')
+                )
+
+                logger.info(f"异步回测任务已启动: {task.id}")
+
+                response_data = {
+                    'task_id': task.id,
+                    'message': '回测任务已启动，请查询任务状态获取进度',
+                    'status_url': f'/api/backtests/tasks/{task.id}/status',
+                    'async_mode': True
+                }
+
+                return response_data, 202
+
+            else:
+                # 同步模式：直接执行
+                logger.info("使用同步模式执行回测")
+
+                engine = BacktestEngine()
+                result = engine.run_backtest(
+                    portfolio_id=data['portfolio_id'],
+                    start_date=data['start_date'],
+                    end_date=data['end_date'],
+                    name=data.get('name')
+                )
+
+                logger.info(f"同步回测完成: 回测ID {result.id}")
+                return result.to_dict(), 201
 
 @ns.route('/<int:backtest_id>')
 class BacktestDetail(Resource):

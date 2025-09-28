@@ -31,6 +31,12 @@ class Config:
     # External APIs
     ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY')
 
+    # WARP Proxy Pool
+    PROXY_POOL_REDIS_URL = os.environ.get('PROXY_POOL_REDIS_URL') or 'redis://localhost:6380/0'
+    USE_PROXY_POOL = os.environ.get('USE_PROXY_POOL', 'True').lower() == 'true'
+    PROXY_HEALTH_CHECK_INTERVAL = int(os.environ.get('PROXY_HEALTH_CHECK_INTERVAL', '60'))
+    PROXY_RATE_LIMIT = float(os.environ.get('PROXY_RATE_LIMIT', '1.5'))  # requests per second
+
 class DevelopmentConfig(Config):
     DEBUG = True
 

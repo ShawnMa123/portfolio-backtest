@@ -128,7 +128,7 @@ class ProxiedYFinance:
         ticker = self._get_ticker()
         return ticker.info
 
-class DataService:
+class EnhancedDataService:
     """增强的数据服务"""
 
     def __init__(self):
