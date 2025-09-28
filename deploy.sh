@@ -36,15 +36,24 @@ show_usage() {
     echo "  --help      显示此帮助信息"
 }
 
-# 检查Docker
+# 检查Docker和Docker Compose
 check_docker() {
     if ! command -v docker &> /dev/null; then
         print_error "Docker未安装，请先安装Docker"
         exit 1
     fi
 
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "Docker Compose未安装，请先安装Docker Compose"
+    # 检查Docker Compose (支持新旧两种方式)
+    if command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+        print_info "使用传统docker-compose命令"
+    elif docker compose version &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+        print_info "使用新版docker compose插件"
+    else
+        print_error "Docker Compose未安装，请安装Docker Compose"
+        print_info "安装方法1: sudo apt install docker-compose-plugin"
+        print_info "安装方法2: sudo apt install docker-compose"
         exit 1
     fi
 
@@ -57,22 +66,22 @@ deploy_full() {
 
     # 停止现有服务
     print_info "停止现有服务..."
-    docker-compose -f docker-compose.full.yml down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml down 2>/dev/null || true
 
     # 构建镜像
     print_info "构建应用镜像..."
-    docker-compose -f docker-compose.full.yml build
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml build
 
     # 启动服务
     print_info "启动所有服务..."
-    docker-compose -f docker-compose.full.yml up -d
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml up -d
 
     print_info "等待服务启动..."
     sleep 10
 
     # 检查服务状态
     print_info "检查服务状态..."
-    docker-compose -f docker-compose.full.yml ps
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml ps
 
     print_info "完全Docker化部署完成！"
     print_info "访问地址: http://localhost:5000"
@@ -86,18 +95,18 @@ deploy_hybrid() {
 
     # 停止现有服务
     print_info "停止现有中间件服务..."
-    docker-compose -f docker-compose.hybrid.yml down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml down 2>/dev/null || true
 
     # 启动中间件
     print_info "启动中间件服务（数据库、Redis、代理池）..."
-    docker-compose -f docker-compose.hybrid.yml up -d
+    $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml up -d
 
     print_info "等待中间件启动..."
     sleep 15
 
     # 检查服务状态
     print_info "检查中间件状态..."
-    docker-compose -f docker-compose.hybrid.yml ps
+    $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml ps
 
     print_info "混合部署中间件启动完成！"
     print_info ""
@@ -112,8 +121,8 @@ deploy_hybrid() {
 stop_services() {
     print_info "停止所有服务..."
 
-    docker-compose -f docker-compose.full.yml down 2>/dev/null || true
-    docker-compose -f docker-compose.hybrid.yml down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml down 2>/dev/null || true
 
     print_info "所有服务已停止"
 }
@@ -126,8 +135,8 @@ clean_all() {
     if [[ $confirm == [yY] ]]; then
         print_info "清理所有容器和数据..."
 
-        docker-compose -f docker-compose.full.yml down -v --rmi all 2>/dev/null || true
-        docker-compose -f docker-compose.hybrid.yml down -v --rmi all 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f docker-compose.full.yml down -v --rmi all 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml down -v --rmi all 2>/dev/null || true
 
         # 清理孤立容器
         docker container prune -f 2>/dev/null || true
@@ -143,11 +152,11 @@ clean_all() {
 # 查看状态
 show_status() {
     print_info "=== 完全Docker化部署状态 ==="
-    docker-compose -f docker-compose.full.yml ps 2>/dev/null || print_warning "完全Docker化部署未运行"
+    $DOCKER_COMPOSE_CMD -f docker-compose.full.yml ps 2>/dev/null || print_warning "完全Docker化部署未运行"
 
     echo ""
     print_info "=== 混合部署状态 ==="
-    docker-compose -f docker-compose.hybrid.yml ps 2>/dev/null || print_warning "混合部署未运行"
+    $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml ps 2>/dev/null || print_warning "混合部署未运行"
 
     echo ""
     print_info "=== 端口占用情况 ==="
@@ -165,17 +174,17 @@ show_logs() {
 
     case $choice in
         1)
-            docker-compose -f docker-compose.full.yml logs -f --tail=100
+            $DOCKER_COMPOSE_CMD -f docker-compose.full.yml logs -f --tail=100
             ;;
         2)
-            docker-compose -f docker-compose.hybrid.yml logs -f --tail=100
+            $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml logs -f --tail=100
             ;;
         3)
             echo "可用服务:"
             echo "  app, celery-worker, postgres, redis, warp-1, warp-2, warp-3, warp-4, warp-5"
             read -p "请输入服务名: " service
-            docker-compose -f docker-compose.full.yml logs -f --tail=100 $service 2>/dev/null || \
-            docker-compose -f docker-compose.hybrid.yml logs -f --tail=100 $service 2>/dev/null || \
+            $DOCKER_COMPOSE_CMD -f docker-compose.full.yml logs -f --tail=100 $service 2>/dev/null || \
+            $DOCKER_COMPOSE_CMD -f docker-compose.hybrid.yml logs -f --tail=100 $service 2>/dev/null || \
             print_error "服务不存在或未运行"
             ;;
         *)

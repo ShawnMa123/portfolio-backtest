@@ -9,11 +9,14 @@
 git clone <your-repo-url> portfolio-backtest
 cd portfolio-backtest
 
-# 2. 一键部署
+# 2. 安装Docker Compose（如果需要）
+./install-docker-compose.sh  # Debian/Ubuntu自动安装
+
+# 3. 一键部署
 ./deploy.sh --full     # Linux/Mac
 # deploy.bat --full    # Windows
 
-# 3. 验证部署
+# 4. 验证部署
 curl http://localhost:5000/health
 ```
 
@@ -98,6 +101,15 @@ curl -X POST http://localhost:5000/api/backtests \
 
 ## 🆘 故障排除
 
+### Docker Compose未安装（Debian/Ubuntu）
+```bash
+# 自动安装
+./install-docker-compose.sh
+
+# 验证安装
+docker compose version  # 或 docker-compose --version
+```
+
 ### 端口占用
 ```bash
 # 检查端口占用
@@ -110,10 +122,11 @@ netstat -tlpn | grep -E ":(5000|5432|6379)"
 ### 容器无法启动
 ```bash
 # 查看详细日志
-docker-compose -f docker-compose.full.yml logs
+./deploy.sh --logs
 
-# 重新构建
-docker-compose -f docker-compose.full.yml build --no-cache
+# 重新构建和部署
+./deploy.sh --stop
+./deploy.sh --full
 ```
 
 ### WARP代理问题

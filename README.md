@@ -51,6 +51,9 @@
 git clone <your-repo-url> portfolio-backtest
 cd portfolio-backtest
 
+# 如果Docker Compose未安装（仅Debian/Ubuntu）
+./install-docker-compose.sh
+
 # 一键部署（包含应用、数据库、Redis、WARP代理池）
 ./deploy.sh --full
 ```
@@ -274,7 +277,18 @@ docker logs portfolio-monitor
 
 ### 常见问题
 
-1. **模块导入错误 (ModuleNotFoundError: No module named 'app')**
+1. **Docker Compose未安装（Debian/Ubuntu）**
+   ```bash
+   # 自动安装Docker Compose
+   ./install-docker-compose.sh
+
+   # 或手动安装
+   sudo apt update
+   sudo apt install docker-compose-plugin
+   # 或传统版本: sudo apt install docker-compose
+   ```
+
+2. **模块导入错误 (ModuleNotFoundError: No module named 'app')**
    ```bash
    # 确保在项目根目录执行脚本
    cd /path/to/portfolio-backtest
@@ -284,16 +298,17 @@ docker logs portfolio-monitor
    cd /path/to/portfolio-backtest && python scripts/celery_worker.py
    ```
 
-2. **WARP代理连接失败**
+3. **WARP代理连接失败**
    ```bash
    # 重启代理池
-   docker-compose -f docker-compose.warp.yml restart
+   ./deploy.sh --stop
+   ./deploy.sh --full
 
    # 检查代理状态
-   docker logs warp-proxy-1
+   ./deploy.sh --logs
    ```
 
-3. **数据库连接问题**
+4. **数据库连接问题**
    ```bash
    # 测试数据库连接
    psql $DATABASE_URL
@@ -302,16 +317,17 @@ docker logs portfolio-monitor
    echo $DATABASE_URL
    ```
 
-4. **Redis连接问题**
+5. **Redis连接问题**
    ```bash
-   # 测试Redis连接
-   redis-cli -u $REDIS_URL ping
+   # 查看服务状态
+   ./deploy.sh --status
 
-   # 检查Celery队列
-   celery -A app.tasks inspect active
+   # 重启所有服务
+   ./deploy.sh --stop
+   ./deploy.sh --full
    ```
 
-5. **内存不足**
+6. **内存不足**
    ```bash
    # 查看系统资源
    free -h
