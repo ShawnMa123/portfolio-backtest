@@ -31,7 +31,9 @@ def wait_for_database():
             from app import create_app, db
             app = create_app()
             with app.app_context():
-                db.engine.execute('SELECT 1')
+                # 使用新的SQLAlchemy语法
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('SELECT 1'))
             logger.info("数据库连接成功")
             return True
         except Exception as e:

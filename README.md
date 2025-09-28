@@ -277,7 +277,19 @@ docker logs portfolio-monitor
 
 ### 常见问题
 
-1. **Docker Compose未安装（Debian/Ubuntu）**
+1. **登录失败问题**
+   ```bash
+   # 快速修复登录问题
+   ./fix-login.sh
+
+   # 系统诊断
+   ./diagnose.sh
+
+   # 手动创建用户
+   ./create-user.sh
+   ```
+
+2. **Docker Compose未安装（Debian/Ubuntu）**
    ```bash
    # 自动安装Docker Compose
    ./install-docker-compose.sh
@@ -288,7 +300,7 @@ docker logs portfolio-monitor
    # 或传统版本: sudo apt install docker-compose
    ```
 
-2. **模块导入错误 (ModuleNotFoundError: No module named 'app')**
+3. **模块导入错误 (ModuleNotFoundError: No module named 'app')**
    ```bash
    # 确保在项目根目录执行脚本
    cd /path/to/portfolio-backtest
@@ -298,7 +310,7 @@ docker logs portfolio-monitor
    cd /path/to/portfolio-backtest && python scripts/celery_worker.py
    ```
 
-3. **WARP代理连接失败**
+4. **WARP代理连接失败**
    ```bash
    # 重启代理池
    ./deploy.sh --stop
@@ -308,16 +320,17 @@ docker logs portfolio-monitor
    ./deploy.sh --logs
    ```
 
-4. **数据库连接问题**
+5. **数据库连接问题**
    ```bash
-   # 测试数据库连接
-   psql $DATABASE_URL
+   # 查看服务状态
+   ./deploy.sh --status
 
-   # 检查连接配置
-   echo $DATABASE_URL
+   # 重启数据库服务
+   ./deploy.sh --stop
+   ./deploy.sh --full
    ```
 
-5. **Redis连接问题**
+6. **Redis连接问题**
    ```bash
    # 查看服务状态
    ./deploy.sh --status
@@ -327,7 +340,7 @@ docker logs portfolio-monitor
    ./deploy.sh --full
    ```
 
-6. **内存不足**
+7. **内存不足**
    ```bash
    # 查看系统资源
    free -h
