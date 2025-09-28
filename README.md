@@ -42,110 +42,72 @@
 
 ## 🚀 快速开始
 
-### 1. 克隆项目
+### 方案1: 完全Docker化部署 (推荐)
+
+**一键部署，包含所有服务**
 
 ```bash
+# 克隆项目
 git clone <your-repo-url> portfolio-backtest
 cd portfolio-backtest
+
+# 一键部署（包含应用、数据库、Redis、WARP代理池）
+./deploy.sh --full
 ```
 
-### 2. 环境配置
+访问地址：
+- 应用主页: http://localhost:5000
+- API文档: http://localhost:5000/api/docs/
+- 健康检查: http://localhost:5000/health
+
+### 方案2: 混合部署
+
+**Docker中间件 + Python手动启动**
 
 ```bash
-# 创建虚拟环境
+# 1. 启动中间件（数据库、Redis、代理池）
+./deploy.sh --hybrid
+
+# 2. 配置Python环境
 python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
 
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-
-# 安装依赖
+# 3. 安装依赖
 pip install -r requirements.txt
-```
 
-### 3. 配置环境变量
+# 4. 复制环境配置
+cp .env.hybrid .env
 
-```bash
-# 复制环境配置模板
-cp .env.example .env
-
-# 编辑配置文件
-nano .env
-```
-
-**重要配置项:**
-```bash
-# 数据库配置
-DATABASE_URL=postgresql://username:password@localhost:5432/portfolio_backtest
-
-# Redis配置
-REDIS_URL=redis://localhost:6379/0
-PROXY_POOL_REDIS_URL=redis://localhost:6380/0
-
-# API密钥
-ALPHA_VANTAGE_API_KEY=your_api_key_here
-
-# 代理池配置
-USE_PROXY_POOL=true
-PROXY_RATE_LIMIT=1.5
-```
-
-### 4. 启动WARP代理池
-
-```bash
-# 启动5个WARP代理实例
-docker-compose -f docker-compose.warp.yml up -d
-
-# 等待代理初始化 (约2分钟)
-sleep 120
-
-# 验证代理状态
-docker ps | grep warp-proxy
-```
-
-### 5. 初始化数据库
-
-```bash
-# 创建数据库表
-python scripts/init_data.py
-```
-
-### 6. 启动服务
-
-**开发环境:**
-```bash
-# 启动Celery Worker (新终端)
-# 注意：确保在项目根目录执行
-cd /path/to/portfolio-backtest
+# 5. 启动Celery Worker（新终端）
 python scripts/celery_worker.py
 
-# 启动Flask应用
+# 6. 启动Flask应用
 python app.py
 ```
 
-**生产环境:**
-```bash
-# 使用部署脚本
-python scripts/deploy.py --env production
-
-# 或手动启动
-nohup python scripts/celery_worker.py > logs/celery.log 2>&1 &
-nohup python app.py > logs/app.log 2>&1 &
-```
-
-### 7. 验证安装
+### 管理命令
 
 ```bash
-# 测试应用健康状态
-curl http://localhost:5000/health
+# 查看服务状态
+./deploy.sh --status
 
-# 测试代理池
-curl http://localhost:5000/api/proxy/test
+# 查看日志
+./deploy.sh --logs
 
-# 访问API文档
-# 浏览器打开: http://localhost:5000/api/docs/
+# 停止所有服务
+./deploy.sh --stop
+
+# 清理所有数据（谨慎使用）
+./deploy.sh --clean
 ```
+
+### 自动化特性
+
+✅ **自动数据库初始化**: 容器启动时自动创建表和示例数据
+✅ **自动代理池配置**: WARP代理自动注册和健康检查
+✅ **自动服务依赖**: 正确的启动顺序和健康检查
+✅ **自动错误恢复**: 服务异常时自动重启
 
 ## 📖 使用指南
 
@@ -260,28 +222,52 @@ portfolio-backtest/
 
 ## 🚀 生产部署
 
-### 自动部署
+### 推荐：完全Docker化部署
 
 ```bash
-# 一键部署到生产环境
-python scripts/deploy.py --env production
+# 克隆到生产服务器
+git clone <your-repo-url> portfolio-backtest
+cd portfolio-backtest
+
+# 修改生产环境配置
+nano .env.docker  # 修改密钥、API Key等
+
+# 一键部署
+./deploy.sh --full
+
+# 查看状态
+./deploy.sh --status
 ```
 
-### 手动部署
+### 可选：混合部署
 
-详细的手动部署步骤请参考: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+适合需要Python环境调试的场景：
+
+```bash
+# 启动中间件
+./deploy.sh --hybrid
+
+# 配置Python环境并启动应用
+cp .env.hybrid .env
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python scripts/celery_worker.py &
+python app.py
+```
 
 ### 系统监控
 
 ```bash
-# 实时监控
-python scripts/monitor.py --monitor
+# 查看所有服务状态
+./deploy.sh --status
 
-# 健康检查
-python scripts/monitor.py
+# 实时查看日志
+./deploy.sh --logs
 
-# 告警检查
-python scripts/monitor.py --alert
+# 内置监控（完全Docker化部署）
+# 监控服务会自动启动，每5分钟检查一次
+docker logs portfolio-monitor
 ```
 
 ## 🔧 故障排除

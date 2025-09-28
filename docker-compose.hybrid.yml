@@ -1,0 +1,158 @@
+# 混合部署方案
+# Docker: 数据库、Redis、WARP代理池
+# 手动: Python应用程序
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15
+    container_name: portfolio-postgres-hybrid
+    environment:
+      POSTGRES_DB: portfolio_backtest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: portfolio_password_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_hybrid_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis - 主要缓存和Celery后端
+  redis:
+    image: redis:7-alpine
+    container_name: portfolio-redis-hybrid
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_hybrid_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis - 代理池专用
+  redis-proxy-pool:
+    image: redis:7-alpine
+    container_name: redis-proxy-pool-hybrid
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_proxy_hybrid_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # WARP 代理池
+  warp-1:
+    image: caomingjun/warp
+    container_name: warp-proxy-1-hybrid
+    restart: unless-stopped
+    ports:
+      - "40001:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-2:
+    image: caomingjun/warp
+    container_name: warp-proxy-2-hybrid
+    restart: unless-stopped
+    ports:
+      - "40002:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-3:
+    image: caomingjun/warp
+    container_name: warp-proxy-3-hybrid
+    restart: unless-stopped
+    ports:
+      - "40003:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-4:
+    image: caomingjun/warp
+    container_name: warp-proxy-4-hybrid
+    restart: unless-stopped
+    ports:
+      - "40004:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-5:
+    image: caomingjun/warp
+    container_name: warp-proxy-5-hybrid
+    restart: unless-stopped
+    ports:
+      - "40005:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  # 数据库初始化服务（一次性运行）
+  db-init:
+    build: .
+    container_name: portfolio-db-init-hybrid
+    environment:
+      - DATABASE_URL=postgresql://postgres:portfolio_password_2024@postgres:5432/portfolio_backtest
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_POOL_REDIS_URL=redis://redis-proxy-pool:6379/0
+      - FLASK_ENV=production
+      - SYNC_DATA=false  # 混合部署时可手动同步数据
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-proxy-pool:
+        condition: service_healthy
+    command: python /app/scripts/docker-init.py
+    restart: "no"
+
+volumes:
+  postgres_hybrid_data:
+    driver: local
+  redis_hybrid_data:
+    driver: local
+  redis_proxy_hybrid_data:
+    driver: local
+
+networks:
+  default:
+    name: portfolio-hybrid-network

@@ -1,0 +1,233 @@
+# 完全Docker化部署方案
+# 包含所有服务：应用、Celery、数据库、Redis、WARP代理池
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15
+    container_name: portfolio-postgres
+    environment:
+      POSTGRES_DB: portfolio_backtest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: portfolio_password_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis - 主要缓存和Celery后端
+  redis:
+    image: redis:7-alpine
+    container_name: portfolio-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis - 代理池专用
+  redis-proxy-pool:
+    image: redis:7-alpine
+    container_name: redis-proxy-pool
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_proxy_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # WARP 代理池
+  warp-1:
+    image: caomingjun/warp
+    container_name: warp-proxy-1
+    restart: unless-stopped
+    ports:
+      - "40001:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-2:
+    image: caomingjun/warp
+    container_name: warp-proxy-2
+    restart: unless-stopped
+    ports:
+      - "40002:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-3:
+    image: caomingjun/warp
+    container_name: warp-proxy-3
+    restart: unless-stopped
+    ports:
+      - "40003:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-4:
+    image: caomingjun/warp
+    container_name: warp-proxy-4
+    restart: unless-stopped
+    ports:
+      - "40004:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  warp-5:
+    image: caomingjun/warp
+    container_name: warp-proxy-5
+    restart: unless-stopped
+    ports:
+      - "40005:1080"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+
+  # 初始化服务
+  init:
+    build: .
+    container_name: portfolio-init
+    environment:
+      - DATABASE_URL=postgresql://postgres:portfolio_password_2024@postgres:5432/portfolio_backtest
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_POOL_REDIS_URL=redis://redis-proxy-pool:6379/0
+      - FLASK_ENV=production
+      - SYNC_DATA=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-proxy-pool:
+        condition: service_healthy
+    command: python /app/scripts/docker-init.py
+    volumes:
+      - app_logs:/app/logs
+    restart: "no"
+
+  # Flask 应用
+  app:
+    build: .
+    container_name: portfolio-app
+    environment:
+      - DATABASE_URL=postgresql://postgres:portfolio_password_2024@postgres:5432/portfolio_backtest
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_POOL_REDIS_URL=redis://redis-proxy-pool:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - FLASK_ENV=production
+      - USE_PROXY_POOL=true
+      - PROXY_RATE_LIMIT=1.5
+      - PROXY_HEALTH_CHECK_INTERVAL=60
+      - SECRET_KEY=your_super_secret_key_change_in_production
+      - JWT_SECRET_KEY=your_jwt_secret_key_change_in_production
+    ports:
+      - "5000:5000"
+    depends_on:
+      - init
+      - postgres
+      - redis
+      - redis-proxy-pool
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  celery-worker:
+    build: .
+    container_name: portfolio-celery-worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:portfolio_password_2024@postgres:5432/portfolio_backtest
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_POOL_REDIS_URL=redis://redis-proxy-pool:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - FLASK_ENV=production
+      - USE_PROXY_POOL=true
+      - PROXY_RATE_LIMIT=1.5
+      - PROXY_HEALTH_CHECK_INTERVAL=60
+    depends_on:
+      - init
+      - postgres
+      - redis
+      - redis-proxy-pool
+    command: python /app/scripts/celery_worker.py
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+
+  # 系统监控
+  monitor:
+    build: .
+    container_name: portfolio-monitor
+    environment:
+      - DATABASE_URL=postgresql://postgres:portfolio_password_2024@postgres:5432/portfolio_backtest
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_POOL_REDIS_URL=redis://redis-proxy-pool:6379/0
+      - FLASK_ENV=production
+    depends_on:
+      - app
+    command: python /app/scripts/monitor.py --monitor --interval 300
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  redis_proxy_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  default:
+    name: portfolio-network
